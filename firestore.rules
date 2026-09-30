@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function validQuestion(data) {
+      return data.keys().hasAll([
+          'ownerUid',
+          'statement',
+          'subject',
+          'options',
+          'correctOptionIndex',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerUid',
+          'statement',
+          'subject',
+          'options',
+          'correctOptionIndex',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.ownerUid == request.auth.uid
+        && data.statement is string
+        && data.statement == data.statement.trim()
+        && data.statement.size() >= 8
+        && data.statement.size() <= 2000
+        && data.subject is string
+        && data.subject == data.subject.trim()
+        && data.subject.size() <= 60
+        && data.options is list
+        && data.options.size() == 4
+        && data.options[0] is string
+        && data.options[0] == data.options[0].trim()
+        && data.options[0].size() > 0
+        && data.options[0].size() <= 400
+        && data.options[1] is string
+        && data.options[1] == data.options[1].trim()
+        && data.options[1].size() > 0
+        && data.options[1].size() <= 400
+        && data.options[2] is string
+        && data.options[2] == data.options[2].trim()
+        && data.options[2].size() > 0
+        && data.options[2].size() <= 400
+        && data.options[3] is string
+        && data.options[3] == data.options[3].trim()
+        && data.options[3].size() > 0
+        && data.options[3].size() <= 400
+        && [
+          data.options[0].lower(),
+          data.options[1].lower(),
+          data.options[2].lower(),
+          data.options[3].lower()
+        ].toSet().size() == 4
+        && data.correctOptionIndex is int
+        && data.correctOptionIndex >= 0
+        && data.correctOptionIndex < 4
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /questions/{questionId} {
+      allow get, list: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn() && validQuestion(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validQuestion(request.resource.data);
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+  }
+}
